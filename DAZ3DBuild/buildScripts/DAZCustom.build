@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="DAZCustom">
+	<description>Custom Functions and Tasks for DAZ Builds</description>
+	<script language="C#" prefix="DAZ">
+		<references>
+			<include name="System.dll" />
+			<include name="System.Text.RegularExpressions.dll" />
+		</references>
+		<imports>
+			<import namespace="System.Collections.Generic"/>
+			<import namespace="System.Text.RegularExpressions" />
+		</imports>
+		<code>
+			<![CDATA[
+				/// @brief Returns the contents of the named file
+				/// @param fileName The name of the file to read.
+				/// @return The file contents.
+				[Function("ReadFileContents")]
+				public static string ReadFileContents(string fileName)
+				{
+					using (StreamReader reader = new StreamReader(fileName))
+					{
+						return reader.ReadToEnd();
+					}
+				}
+
+				public static void WriteFileContents(string fileName, string contents)
+				{
+					using (StreamWriter writer = new StreamWriter(fileName, false))
+					{
+						writer.Write(contents);
+					}
+				}
+
+				/*
+					A convenience method to do both combining two paths and removing relative references
+					@param	path1	The first part of the resulting path
+					@param	path2	The second part of the resulting path
+					@return	A fully qualified path from concatenating path1 and path2 and removing all relative references
+				*/
+				[Function("RemoveRelativeRefsCombine")]
+				public static string RemoveRelativeRefsCombine(string path1, string path2)
+				{
+					return Path.GetFullPath(Path.Combine(path1, path2));
+				}
+
+				/*
+					The built-in path::get-full-path() method will not replace relative portions in the path string so this
+					method had to be written.
+					@param	path	The path to remove relative references
+					@return	A fully qualified path with all relative portions replaced
+				*/
+				[Function("RemoveRelativeRefs")]
+				public static string RemoveRelativeRefs(string path)
+				{
+					return Path.GetFullPath(path);
+				}
+
+				/*
+					Handles the source building folder naming conventions (Mac32/Mac64, Win32/x64)
+					@param os				The OS of this project (Win or Mac)
+					@param bitArchitecture	The bit architecture to get information for (32 or 64)
+					@return The folder name to use.
+				*/
+				[Function("GetSourceFolderName")]
+				public static string GetSourceFolderName(String os, int bitArchitecture)
+				{
+					String folderName = os + bitArchitecture;
+
+					// convert to "x64" compile dir instead of Win64
+					if (os.ToUpper() == "WIN")
+					{
+						if (bitArchitecture == 64)
+							folderName = "x64";
+					}
+
+					return folderName;
+				}
+
+				/*
+					Handles the "exec" source building folder naming conventions (Mac32/Mac64, Win32/x64)
+					@param os				The OS of this project (Win or Mac)
+					@param bitArchitecture	The bit architecture to get information for (32 or 64)
+					@return The folder name to use.
+				*/
+				[Function("GetExecFolderName")]
+				public static string GetExecFolderName(String projectRootPath, String os, int bitArchitecture)
+				{
+					String baseExePath = Path.Combine(projectRootPath, "exec/Release/" + os + bitArchitecture);
+
+					// convert to "x64" compile dir instead of Win64
+					if (os.ToUpper() == "WIN")
+					{
+						if (bitArchitecture == 64)
+							baseExePath = Path.Combine(projectRootPath, "exec/Release/" + "x64");
+					}
+
+					return baseExePath;
+				}
+
+				/*
+					@param projectRootPath	The path to the root of this project
+					@param bitArchitecture	The bit architecture to get information for (32 or 64)
+					@return The version of DAZ Studio converted to a decimal number
+				*/
+				[Function("GetVersionDecimalStudio")]
+				public static string GetVersionDecimalStudio(String projectRootPath, String os, int bitArchitecture)
+				{
+					String exeSuffix = (os.ToUpper() == "WIN") ? ".exe" : "";
+					String baseExePath = Path.Combine(projectRootPath, "exec/Release/" + os + bitArchitecture);
+
+					// convert to "x64" compile dir instead of Win64
+					if (os.ToUpper() == "WIN")
+					{
+						if (bitArchitecture == 64)
+							baseExePath = Path.Combine(projectRootPath, "exec/Release/" + "x64");
+					}
+
+					System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
+					startInfo.FileName = Path.Combine(baseExePath, "dzcoreutil" + exeSuffix);
+					startInfo.Arguments = "-dvs64";
+					startInfo.CreateNoWindow = true;
+					startInfo.RedirectStandardOutput = true;
+					startInfo.UseShellExecute = false;
+
+					if (os.ToUpper() != "WIN")
+					{
+						String dyldPath = Path.Combine(baseExePath, "DAZStudio.app/Contents/Frameworks");
+						startInfo.EnvironmentVariables.Add("DYLD_LIBRARY_PATH", dyldPath);
+						startInfo.EnvironmentVariables.Add("DYLD_FRAMEWORK_PATH", dyldPath);
+					}
+
+					using (System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo))
+					{
+						return process.StandardOutput.ReadToEnd();
+					}
+				}
+
+				/*
+					@param projectRootPath	The path to the root of this project
+					@param bitArchitecture	The bit architecture to get information for (32 or 64)
+					@return The version of DAZ Studio converted to a decimal number
+				*/
+				[Function("GetVersionDecimalUpdater")]
+				public static string GetVersionDecimalUpdater(String projectRootPath, String os, int bitArchitecture)
+				{
+					String exeSuffix = (os.ToUpper() == "WIN") ? ".exe" : "";
+					String baseExePath = Path.Combine(projectRootPath, "exec/Release/" + os + bitArchitecture);
+
+					// convert to "x64" compile dir instead of Win64
+					if (os.ToUpper() == "WIN")
+					{
+						if (bitArchitecture == 64)
+							baseExePath = Path.Combine(projectRootPath, "exec/Release/" + "x64");
+					}
+
+					System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
+					startInfo.FileName = Path.Combine(baseExePath, "dzcoreutil" + exeSuffix);
+					startInfo.Arguments = "-dvs64";
+					startInfo.CreateNoWindow = true;
+					startInfo.RedirectStandardOutput = true;
+					startInfo.UseShellExecute = false;
+
+					if (os.ToUpper() != "WIN")
+					{
+						String dyldPath = Path.Combine(baseExePath, "DAZStudio.app/Contents/Frameworks");
+						startInfo.EnvironmentVariables.Add("DYLD_LIBRARY_PATH", dyldPath);
+						startInfo.EnvironmentVariables.Add("DYLD_FRAMEWORK_PATH", dyldPath);
+					}
+
+					using (System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo))
+					{
+						return process.StandardOutput.ReadToEnd();
+					}
+				}
+
+				[Function("GetVersionNumFromFile")]
+				public static string GetVersionNumFromFile(String file, string pattern)
+				{
+					string contents;
+					using (StreamReader reader = new StreamReader(file))
+					{
+						contents = reader.ReadToEnd();
+					}
+
+					string regPattern = "#define[\\s]+" + pattern + "[\\s]+[\\d]+";
+					Regex reg = new Regex(regPattern);
+					string matchStr = reg.Match(contents).ToString();
+
+					reg = new Regex("[\\d]+");
+					string versionStr = reg.Match(matchStr).ToString();
+
+					return versionStr;
+				}
+
+				/*
+					Custom task to take care of updating the build number
+				*/
+				[TaskName("stamp-build-number")]
+				public class StampBuildNumberTask : Task
+				{
+					[TaskAttribute("file", Required = true)]
+					public string File
+					{
+						get{ return m_file; }
+						set{ m_file = value; }
+					}
+					private string m_file;
+
+					[TaskAttribute("number", Required = true)]
+					public String Number
+					{
+						get{ return m_number; }
+						set{ m_number = value; }
+					}
+					private string m_number;
+
+					protected override void ExecuteTask()
+					{
+						using (StreamWriter writer = new StreamWriter(m_file, false))
+						{
+							writer.WriteLine(m_number);
+						}
+					}
+				}
+			]]>
+		</code>
+	</script>
+</project>
