@@ -94,10 +94,10 @@
     <exec program="git" verbose="${verbose}">
       <arg value="commit" />
       <arg value="-m" />
-      <arg value="DzCloud : Implemented : Increment build number" />
+      <arg value="Protocol Buffers : Implemented : Increment build number" />
     </exec>
     <exec program="git" commandline="tag ${version}" />
-    <exec program="git" commandline="push origin ${dzcloud.branch}" />
+    <exec program="git" commandline="push origin ${protobuf.branch}" />
     <exec program="git" commandline="push origin --tags" />
   </target>
 
