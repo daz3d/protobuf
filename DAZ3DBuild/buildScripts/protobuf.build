@@ -1,314 +1,326 @@
 <?xml version="1.0" encoding="utf-8"?>
-<project name="Boost" default="publish">
-	<description>The build file for boost</description>
+<project name="Protocol Buffers" default="publish">
+  <description>The build file for Protocol Buffers</description>
 
-	<property  readonly="true" name="product.name" value="Boost" />
+  <property  readonly="true" name="product.name" value="Protocol Buffers" />
 
-	<include buildfile="DAZCustom.build" />
+  <include buildfile="DAZCustom.build" />
 
-	<!-- Operating System properties -->
-	<property readonly="true" name="os.platform" value="${operating-system::get-platform(environment::get-operating-system())}" />
-	<property readonly="true" name="os.win" value="${os.platform == 'Win32NT'}" />
-	<property readonly="true" name="os.mac" value="${not(os.win)}" />
-	<property readonly="true" name="os.win.64" value="${environment::variable-exists('PROGRAMW6432')}" />
-  
-	<!-- SDK 5 properties -->
-	<if test="${not property::exists('compile.sdk5')}">
-		<property readonly="true" name="compile.sdk5" value="true" /><!-- Defaults to true for this project -->
-	</if>
-	<if test="${compile.sdk5}">
-		<property readonly="true" name="compile.vc.short.version" value="14" />
-		<property readonly="true" name="compile.vc.year" value="2015" />
-		<property readonly="true" name="sdk.suffix" value="_sdk5" />
-		<if test="${os.win}">
-			<if test="${not property::exists('msbuild.exe')}">
-				<property readonly="true" name="msbuild.exe" value="${path::combine(environment::get-variable('ProgramFiles(x86)'), 'MSBuild/14.0/bin/MSBuild.exe')}" />
-			</if>
-		</if>
-	</if>
-	<if test="${not compile.sdk5}">
-		<property readonly="true" name="compile.vc.short.version" value="10" />
-		<property readonly="true" name="compile.vc.year" value="2010" />
-		<property readonly="true" name="sdk.suffix" value="" />
-	</if>
+  <!-- Operating System properties -->
+  <property readonly="true" name="os.platform" value="${operating-system::get-platform(environment::get-operating-system())}" />
+  <property readonly="true" name="os.win" value="${os.platform == 'Win32NT'}" />
+  <property readonly="true" name="os.mac" value="${not(os.win)}" />
+  <property readonly="true" name="os.win.64" value="${environment::variable-exists('PROGRAMW6432')}" />
 
-	<!-- Subversion configuration properties -->
-	<if test="${not property::exists('dzserialnumber.trunk.repo')}">
-		<property readonly="true" name="dzserialnumber.trunk.repo" value="svn+ssh://dazrd.daz3d.com/svn/daztools/DzSerialNumber/trunk" />
-	</if>
-
-	<!-- Source directory and file properties -->
-	<property readonly="true" name="project.root.dir" value="${DAZ::RemoveRelativeRefsCombine(project::get-base-directory(), '../')}" />
-	<property readonly="true" name="project.src.dir" value="${path::combine(project.root.dir, 'src')}" />
-	<property readonly="true" name="project.tools.dir" value="${path::combine(project.root.dir, 'tools')}" />
-	<property readonly="true" name="protobuf-build-number.txt" value="${project::get-base-directory() + '/protobuf-build-number.txt'}" />
-
-	<!-- Build behavior properties -->
-	<property readonly="true" name="verbose" value="${property::exists('debug') and debug}" />
-	<property readonly="true" name="build.rebuild" value="false" unless="${property::exists('build.rebuild')}" />
-	<property readonly="true" name="msbuild.target.switch" value="/t:build" unless="${build.rebuild}" />
-	<property readonly="true" name="msbuild.target.switch" value="/t:rebuild" if="${build.rebuild}" />
-	<property readonly="true" name="build.os.platform" value="Win" if="${os.win}" />
-	<property readonly="true" name="build.os.platform" value="Mac" if="${os.mac}" />
-	<if test="${not property::exists('dsdev.dir')}">
-		<if test="${not environment::variable-exists('DSDEV')}">
-			<fail message="dsdev.dir property not set and DSDEV environment variable not set.  One of these must be specified to locate the necessary dependencies." />
-		</if>
-		<property readonly="true" name="dsdev.dir" value="${environment::get-variable('DSDEV')}" />
-	</if>
-
-	<!-- Product version properties -->
-	<property readonly="true" name="version.major" value="1" />
-	<property readonly="true" name="version.minor" value="60" />
-	<property readonly="true" name="version.revision" value="0" />
-	<property readonly="true" name="version.build.last" value="${DAZ::ReadFileContents(protobuf-build-number.txt)}" />
-	<property readonly="true" name="version.build.inc" value="1" />
-	<property readonly="true" name="version.build" value="${int::parse(string::trim(version.build.last)) + int::parse(string::trim(version.build.inc))}" />
-	<property readonly="true" name="version" value="${version.major}.${version.minor}.${version.revision}.${version.build}" />
-	<property readonly="true" name="version.tag" value="${version.major}_${version.minor}_${version.revision}_${version.build}" />
-	<echo message="Building ${project::get-name()}, version ${version}" />
-
-	<!-- Publishing directory properties -->
-	<property readonly="false" name="debug.publish.local" value="false" unless="${property::exists('debug.publish.local')}" />
-	<if test="${debug.publish.local}">
-		<property readonly="true" name="publish.dir" value="${project.root.dir}/publish" />
-	</if>
-	<if test="${not debug.publish.local}">
-		<property readonly="true" name="publish.dir" value="\\rubin\builds\Dependencies\Win" if="${os.win}" />
-		<property readonly="true" name="publish.dir" value="/Volumes/builds/Dependencies/Mac" if="${os.mac}" />
-	</if>
-	<if test="${not property::exists('publish.dir')}">
-		<fail message="Property publish.dir not set." />
-	</if>
-	<property readonly="true" name="packaging.dir" value="${project.root.dir}/packaging" />
-	
-	<property readonly="true" name="boost.publish.dir" value="${publish.dir}/Boost" />
-	<property readonly="true" name="boost.packaging.dir" value="${project.root.dir}/packaging/boost" />
-  
-	<property readonly="true" name="dzserial-number.publish.dir" value="${publish.dir}/DzSerialNumber" />
-	<property readonly="true" name="dzserial-number.packaging.dir" value="${packaging.dir}/dzserialnumber" />
-
-	<!-- Build configuration properties -->
-	<if test="${os.win}">
-		<if test="${not property::exists('msbuild.exe')}">
-			<property readonly="true" name="msbuild.exe" value="${path::combine(environment::get-variable('windir'), 'Microsoft.NET/Framework/v4.0.30319/msbuild.exe')}" />
-		</if>
-		<if test="${not file::exists(msbuild.exe)}">
-			<fail message="msbuild.exe not found in ${msbuild.exe}.  Set the msbuild.exe property to the full path of msbuild.exe.  This must be set for the build to succeed on Windows." />
-		</if>
-	</if>
-
-	<target name="commit-inc-version" description="Records the incremented build number.">
-		<stamp-build-number file="${protobuf-build-number.txt}" number="${version.build}" />
-		<exec program="svn" verbose="${verbose}">
-			<arg value="commit" />
-			<arg value="${protobuf-build-number.txt}" />
-			<arg value="-m" />
-			<arg value="Source Dependencies : Implemented : Increment build number" />
-		</exec>
-		<exec program="svn" verbose="${verbose}">
-			<arg value="copy"/>
-			<arg value="${project.root.dir}"/>
-			<arg value="${source.repository}/tags/${version.tag}"/>
-			<arg value="-m" />
-			<arg value="Source Dependencies : Tagged : Tagged version ${version}"/>
-		</exec>
-	</target>
-
-	<target name="clean">
-		<delete dir="${project.root.dir}/build" />
-		<delete dir="${project.root.dir}/packaging" />
-		<delete>
-			<fileset basedir="${project.root.dir}">
-				<include name="*.tar.gz" />
-				<include name="*.zip" />
-			</fileset>
-		</delete>
-	</target>
-
-	<target name="publish" description="Publishes packages" depends="package, publish-boost, publish-dzserial-number" />
-
-	<target name="package" description="Packages staged files for publishing" depends="stage, package-boost, package-dzserial-number" />
-
-	<target name="stage" description="Stages build outputs for packaging" depends="compile, stage-boost, stage-dzserial-number" />
-
-	<target name="compile" description="Compiles source code for staging" depends="compile-boost, compile-dzserial-number" />
-
-  <target name="publish-boost">
-    <if test="${not directory::exists(boost.publish.dir)}">
-      <mkdir dir="${boost.publish.dir}" verbose="${verbose}" />
+  <!-- SDK 5 properties -->
+  <if test="${not property::exists('compile.sdk5')}">
+    <property readonly="true" name="compile.sdk5" value="true" />
+    <!-- Defaults to true for this project -->
+  </if>
+  <if test="${compile.sdk5}">
+    <property readonly="true" name="compile.vc.short.version" value="14" />
+    <property readonly="true" name="compile.vc.year" value="2015" />
+    <property readonly="true" name="sdk.suffix" value="_sdk5" />
+    <if test="${os.win}">
+      <if test="${not property::exists('msbuild.exe')}">
+        <property readonly="true" name="msbuild.exe" value="${path::combine(environment::get-variable('ProgramFiles(x86)'), 'MSBuild/14.0/bin/MSBuild.exe')}" />
+      </if>
     </if>
-    <copy todir="${boost.publish.dir}" verbose="${verbose}">
-      <fileset basedir="${project.root.dir}">
-        <include name="Boost-${version}.zip" />
-        <include name="Boost-${version}.tar.gz" />
+  </if>
+  <if test="${not compile.sdk5}">
+    <property readonly="true" name="compile.vc.short.version" value="10" />
+    <property readonly="true" name="compile.vc.year" value="2010" />
+    <property readonly="true" name="sdk.suffix" value="" />
+  </if>
+
+  <!-- Source directory and file properties -->
+  <property readonly="true" name="project.root.dir" value="${DAZ::RemoveRelativeRefsCombine(project::get-base-directory(), '../../')}" />
+  <property readonly="true" name="project.daz.build.root.dir" value="${DAZ::RemoveRelativeRefsCombine(project::get-base-directory(), '../../DAZ3DBuild')}" />
+  <property readonly="true" name="project.src.dir" value="${project.root.dir}" />
+  <property readonly="true" name="project.tools.dir" value="${path::combine(project.daz.build.root.dir, 'tools')}" />
+  <property readonly="true" name="build-number.txt" value="${project::get-base-directory() + '/protobuf-build-number.txt'}" />
+
+  <!-- Build behavior properties -->
+  <property readonly="true" name="verbose" value="${property::exists('debug') and debug}" />
+  <property readonly="true" name="build.rebuild" value="false" unless="${property::exists('build.rebuild')}" />
+  <property readonly="true" name="msbuild.target.switch" value="/t:build" unless="${build.rebuild}" />
+  <property readonly="true" name="msbuild.target.switch" value="/t:rebuild" if="${build.rebuild}" />
+  <property readonly="true" name="build.os.platform" value="Win" if="${os.win}" />
+  <property readonly="true" name="build.os.platform" value="Mac" if="${os.mac}" />
+
+  <!-- Product version properties -->
+  <property readonly="true" name="version.major" value="3" />
+  <property readonly="true" name="version.minor" value="0" />
+  <property readonly="true" name="version.revision" value="0" />
+  <property readonly="true" name="version.build.last" value="${DAZ::ReadFileContents(build-number.txt)}" />
+  <property readonly="true" name="version.build.inc" value="1" />
+  <property readonly="true" name="version.build" value="${int::parse(string::trim(version.build.last)) + int::parse(string::trim(version.build.inc))}" />
+  <property readonly="true" name="version" value="${version.major}.${version.minor}.${version.revision}.${version.build}" />
+  <property readonly="true" name="version.tag" value="${version.major}_${version.minor}_${version.revision}_${version.build}" />
+  <echo message="Building ${project::get-name()}, version ${version}" />
+
+  <!-- Publishing directory properties -->
+  <property readonly="false" name="debug.publish.local" value="false" unless="${property::exists('debug.publish.local')}" />
+  <if test="${debug.publish.local}">
+    <property readonly="true" name="publish.dir" value="${project.daz.build.root.dir}/publish" />
+  </if>
+  <if test="${not debug.publish.local}">
+    <property readonly="true" name="publish.dir" value="\\rubin\builds\Dependencies\Win" if="${os.win}" />
+    <property readonly="true" name="publish.dir" value="/Volumes/builds/Dependencies/Mac" if="${os.mac}" />
+  </if>
+  <if test="${not property::exists('publish.dir')}">
+    <fail message="Property publish.dir not set." />
+  </if>
+  <property readonly="true" name="packaging.dir" value="${project.daz.build.root.dir}/packaging" />
+
+  <property readonly="true" name="protobuf.publish.dir" value="${path::combine(publish.dir,'protobuf')}" />
+  <property readonly="true" name="protobuf.packaging.dir" value="${project.daz.build.root.dir}/packaging" />
+
+  <!-- Build configuration properties -->
+  <if test="${os.win}">
+    <if test="${not property::exists('msbuild.exe')}">
+      <property readonly="true" name="msbuild.exe" value="${path::combine(environment::get-variable('windir'), 'Microsoft.NET/Framework/v4.0.30319/msbuild.exe')}" />
+    </if>
+    <if test="${not file::exists(msbuild.exe)}">
+      <fail message="msbuild.exe not found in ${msbuild.exe}.  Set the msbuild.exe property to the full path of msbuild.exe.  This must be set for the build to succeed on Windows." />
+    </if>
+  </if>
+
+  <property readonly="true" name="protobuf.base.build.dir" value="${project.daz.build.root.dir}/build" />
+
+  <target name="commit-inc-version" description="Records the incremented build number.">
+    <stamp-build-number file="${build-number.txt}" number="${version.build}" />
+    <exec program="git" commandline="add ${build-number.txt}" verbose="${verbose}" />
+    <exec program="git" verbose="${verbose}">
+      <arg value="commit" />
+      <arg value="-m" />
+      <arg value="DzCloud : Implemented : Increment build number" />
+    </exec>
+    <exec program="git" commandline="tag ${version}" />
+    <exec program="git" commandline="push origin ${dzcloud.branch}" />
+    <exec program="git" commandline="push origin --tags" />
+  </target>
+
+  <target name="clean">
+    <delete dir="${project.daz.build.root.dir}/build" />
+    <delete dir="${project.daz.build.root.dir}/packaging" />
+    <delete>
+      <fileset basedir="${project.daz.build.root.dir}">
+        <include name="*.tar.gz" />
+        <include name="*.zip" />
+      </fileset>
+    </delete>
+  </target>
+
+  <target name="publish" description="Publishes packages" depends="package, publish-protobuf" />
+
+  <target name="package" description="Packages staged files for publishing" depends="stage, package-protobuf" />
+
+  <target name="stage" description="Stages build outputs for packaging" depends="compile, stage-protobuf" />
+
+  <target name="compile" description="Compiles source code for staging" depends="compile-protobuf" />
+
+  <target name="publish-protobuf">
+    <if test="${not directory::exists(protobuf.publish.dir)}">
+      <mkdir dir="${protobuf.publish.dir}" verbose="${verbose}" />
+    </if>
+    <copy todir="${protobuf.publish.dir}" verbose="${verbose}">
+      <fileset basedir="${project.daz.build.root.dir}">
+        <include name="protobuf-${version}.zip" />
+        <include name="protobuf-${version}.tar.gz" />
       </fileset>
     </copy>
   </target>
-  
-  <target name="package-boost">
+
+  <target name="package-protobuf">
     <if test="${os.win}">
-      <zip zipfile="${project.root.dir}boost-${version}.zip" verbose="${verbose}">
-        <fileset basedir="${packaging.dir}/boost" failonempty="true">
+      <zip zipfile="${project.daz.build.root.dir}/protobuf-${version}.zip" verbose="${verbose}">
+        <fileset basedir="${packaging.dir}" failonempty="true">
           <include name="**" />
         </fileset>
       </zip>
     </if>
     <if test="${os.mac}">
-      <tar destfile="${project.root.dir}/boost-${version}.tar.gz" compression="GZip">
-        <fileset basedir="${packaging.dir}/boost" failonempty="true">
+      <tar destfile="${project.daz.build.root.dir}/protobuf-${version}.tar.gz" compression="GZip">
+        <fileset basedir="${packaging.dir}" failonempty="true">
           <include name="**" />
         </fileset>
       </tar>
     </if>
   </target>
-	
-  <target name="stage-boost" if="${os.win}">
-    <mkdir dir="${boost.packaging.dir}" verbose="${verbose}" />
-    <copy todir="${boost.packaging.dir}">
-      <fileset basedir="${project.src.dir}">
-        <include name="boost/**" />
-      </fileset>
-    </copy>
-  </target>
 
-  <target name="compile-boost" if="${os.win}">
-    <exec program="${project.src.dir}\bootstrap.bat" workingdir="${project.src.dir}" verbose="${verbose}" />
-    <mkdir dir="${boost.packaging.dir}/Win32" verbose="${verbose}" />
-    <mkdir dir="${boost.packaging.dir}/x64" verbose="${verbose}" />
+  <target name="stage-protobuf" >
+    <mkdir dir="${protobuf.packaging.dir}" verbose="${verbose}" />
 
     <property name="build.bit.architecture" value="32" />
-    <call target="compile-boost-platform" />
-    
+    <call target="stage-protobuf-platform" />
+
     <property name="build.bit.architecture" value="64" />
-    <call target="compile-boost-platform" />
-  </target>
-  
-  <target name="compile-boost-platform" if="${os.win}">
-    <exec program="${project.src.dir}\b2" workingdir="${project.src.dir}" verbose="${verbose}" >
-			<arg value="-j8" />
-      <arg value="--build-dir=${project.root.dir}\build\Win${build.bit.architecture}" />
-      <arg value="--toolset=msvc-14.0" />
-      <arg value="address-model=64" if="${build.bit.architecture == '64'}" />
-      <arg value="--build-type=complete" />
-      <arg value="--without-python" />
-      <arg value="stage" />
-      <arg value="--stagedir=${project.root.dir}\packaging\boost\Win32" if="${build.bit.architecture == '32'}" />
-      <arg value="--stagedir=${project.root.dir}\packaging\boost\x64" if="${build.bit.architecture == '64'}"/>
-    </exec>
+    <call target="stage-protobuf-platform" />
   </target>
 
-  <target name="publish-dzserial-number">
-    <if test="${not directory::exists(dzserial-number.publish.dir)}">
-      <mkdir dir="${dzserial-number.publish.dir}" verbose="${verbose}" />
-    </if>
-    <copy todir="${dzserial-number.publish.dir}" verbose="${verbose}">
-      <fileset basedir="${project.root.dir}">cd
-        <include name="DzSerialNumber${sdk.suffix}-${version}.zip" />
-        <include name="DzSerialNumber${sdk.suffix}-${version}.tar.gz" />
-      </fileset>
-    </copy>
-  </target>
-  
-  <target name="package-dzserial-number" >
+  <target name="stage-protobuf-platform">
     <if test="${os.win}">
-      <zip zipfile="${project.root.dir}/DzSerialNumber${sdk.suffix}-${version}.zip" verbose="${verbose}">
-        <fileset basedir="${packaging.dir}/dzserialnumber" failonempty="true">
-          <include name="include/**" />
-          <include name="lib/**" />
-        </fileset>
-      </zip>
+      <property name="build.platform" value="Win32" if="${build.bit.architecture == '32'}" />
+      <property name="build.platform" value="x64" if="${build.bit.architecture == '64'}" />
     </if>
     <if test="${os.mac}">
-      <tar destfile="${project.root.dir}/DzSerialNumber${sdk.suffix}-${version}.tar.gz" compression="GZip">
-        <fileset basedir="${packaging.dir}/dzserialnumber" failonempty="true">
-          <include name="include/**" />
-          <include name="lib/**" />
-        </fileset>
-      </tar>
+      <property name="build.platform" value="Mac32" if="${build.bit.architecture == '32'}" />
+      <property name="build.platform" value="Mac64" if="${build.bit.architecture == '64'}" />
     </if>
-  </target>
-  
-  <target name="stage-dzserial-number" >
-    
-    <mkdir dir="${dzserial-number.packaging.dir}/include" verbose="${verbose}" />
-    <copy todir="${dzserial-number.packaging.dir}/include">
-      <fileset basedir="${dzserialnumber.trunk.dir}/include">
-        <include name="*.h" />
-      </fileset>
-    </copy>
 
-    <property name="build.platform" value="Win32" if="${os.win}" />
-    <property name="build.platform" value="Mac32" if="${os.mac}" />
-    <call target="stage-dzserial-number-platform"/>
+    <property name="protobuf.build.dir" value="${protobuf.base.build.dir}/${build.platform}" />
+    <property name="protobuf.platform.packaging.dir" value="${protobuf.packaging.dir}/${build.platform}" />
+    <mkdir dir="${protobuf.platform.packaging.dir}" verbose="${verbose}" />
 
-    <property name="build.platform" value="x64" if="${os.win}" />
-    <property name="build.platform" value="Mac64" if="${os.mac}" />
-    <call target="stage-dzserial-number-platform"/>
-  </target>
-
-  <target name="stage-dzserial-number-platform">
     <property name="build.configuration" value="Debug" />
-    <call target="stage-dzserial-number-configuration" />
+    <property name="build.solution.configuration" value="Debug" />
+    <call target="stage-protobuf-configuration" />
 
     <property name="build.configuration" value="Release" />
-    <call target="stage-dzserial-number-configuration" />
+    <property name="build.solution.configuration" value="RelWithDebInfo" />
+    <call target="stage-protobuf-configuration" unless="${property::exists('build.quick')}"/>
   </target>
 
-  <target name="stage-dzserial-number-configuration">
-    <copy todir="${dzserial-number.packaging.dir}/lib/${build.platform}/${build.configuration}">
-      <fileset basedir="${dzserialnumber.trunk.dir}/lib_sdk5/${build.configuration}/${build.platform}">
-        <include name="*.lib" />
-        <include name="*.a" />
+  <target name="stage-protobuf-configuration">
+    <property name="build.protobuf.configuration.dir" value="${protobuf.build.dir}/${build.configuration}" />
+    <property name="protobuf.configuration.packaging.dir" value="${protobuf.platform.packaging.dir}/${build.configuration}" />
+    <mkdir dir="${protobuf.configuration.packaging.dir}" verbose="${verbose}" />
+
+    <copy todir="${protobuf.configuration.packaging.dir}" verbose="${verbose}">
+      <fileset basedir="${build.protobuf.configuration.dir}/Install">
+        <include name="bin/**"/>
+        <include name="lib/**"/>
+        <exclude name="include/**" />
       </fileset>
     </copy>
+
+    <if test="${build.configuration=='Release'}">
+      <copy todir="${protobuf.packaging.dir}" verbose="${verbose}" if="${build.bit.architecture == '64'}">
+        <fileset basedir="${build.protobuf.configuration.dir}/Install">
+          <include name="include/**" />
+        </fileset>
+      </copy>
+    </if>
+    
+    <if test="${os.win}">
+      <copy todir="${protobuf.configuration.packaging.dir}/lib" verbose="${verbose}">
+        <fileset basedir="${build.protobuf.configuration.dir}/libprotobuf.dir/${build.solution.configuration}">
+          <include name="*.pdb"/>
+        </fileset>
+      </copy>
+
+      <copy todir="${protobuf.configuration.packaging.dir}/lib" verbose="${verbose}">
+        <fileset basedir="${build.protobuf.configuration.dir}/libprotobuf-lite.dir/${build.solution.configuration}">
+          <include name="*.pdb"/>
+        </fileset>
+      </copy>
+
+      <copy todir="${protobuf.configuration.packaging.dir}/lib" verbose="${verbose}">
+        <fileset basedir="${build.protobuf.configuration.dir}/libprotoc.dir/${build.solution.configuration}">
+          <include name="*.pdb"/>
+        </fileset>
+      </copy>
+
+      <copy todir="${protobuf.configuration.packaging.dir}/bin" verbose="${verbose}">
+        <fileset basedir="${build.protobuf.configuration.dir}/${build.solution.configuration}">
+          <include name="protoc.pdb"/>
+        </fileset>
+      </copy>
+    </if>
+    
   </target>
 
-  <target name="compile-dzserial-number" depends="compile-boost, stage-boost">
+  <target name="compile-protobuf" >
+    <property name="build.bit.architecture" value="32" />
+    <call target="compile-protobuf-platform" />
 
-    <property name="dzserialnumber.source" value="local" />
+    <property name="build.bit.architecture" value="64" />
+    <call target="compile-protobuf-platform" />
+  </target>
+
+  <target name="compile-protobuf-platform">
+    <if test="${os.win}">
+      <property name="build.platform" value="Win32" if="${build.bit.architecture == '32'}" />
+      <property name="build.platform" value="x64" if="${build.bit.architecture == '64'}" />
+    </if>
+    <if test="${os.mac}">
+      <property name="build.platform" value="Mac32" if="${build.bit.architecture == '32'}" />
+      <property name="build.platform" value="Mac64" if="${build.bit.architecture == '64'}" />
+    </if>
+
+    <property name="protobuf.build.dir" value="${protobuf.base.build.dir}/${build.platform}" />
+    <mkdir dir="${protobuf.build.dir}" verbose="${verbose}" />
     
-    <if test="${not(property::exists('dzserialnumber.trunk.dir'))}">
-      <property readonly="true" name="dzserialnumber.trunk.dir" value="${project.root.dir}/build/src/DzSerialNumber" />
-      <exec program="svn" verbose="${verbose}">
-        <arg value="checkout" />
-        <arg value="${dzserialnumber.trunk.repo}" />
-        <arg value="${dzserialnumber.trunk.dir}" />
+    <property name="build.configuration" value="Debug" />
+    <property name="build.solution.configuration" value="Debug" />
+    <call target="compile-protobuf-configuration" />
+
+    <property name="build.configuration" value="Release" />
+    <property name="build.solution.configuration" value="RelWithDebInfo" />
+    <call target="compile-protobuf-configuration" unless="${property::exists('build.quick')}"/>
+  </target>
+
+  <target name="compile-protobuf-configuration">
+
+    <property name="build.protobuf.configuration.dir" value="${protobuf.build.dir}/${build.configuration}" />
+    <delete dir="${build.protobuf.configuration.dir}" if="${directory::exists(build.protobuf.configuration.dir)}" verbose="${verbose}" />
+    <mkdir dir="${build.protobuf.configuration.dir}" verbose="${verbose}" />
+
+    <property name="configuration.install.dir" value="${path::combine(build.protobuf.configuration.dir, 'Install')}" />
+    
+    <if test="${os.win}">
+      <exec program="cmake" workingdir="${build.protobuf.configuration.dir}" if="${os.win}" verbose="${verbose}">
+        <arg value="-G" />
+        <arg value="Visual Studio ${compile.vc.short.version} ${compile.vc.year} Win64" if="${build.platform == 'x64'}" />
+        <arg value="Visual Studio ${compile.vc.short.version} ${compile.vc.year}" if="${build.platform == 'Win32'}" />
+        <arg value="-Dprotobuf_BUILD_TESTS=OFF" />
+        <arg value="-Dprotobuf_MSVC_STATIC_RUNTIME=OFF" />
+        <arg value="-Dprotobuf_DEBUG_POSTFIX=&quot;&quot;" />
+        <arg value="-DCMAKE_INSTALL_PREFIX=${configuration.install.dir}" />
+        <arg value="${project.src.dir}/cmake" />
       </exec>
-      <property name="dzserialnumber.source" value="svn" />
-    </if>
-    
-    <property name="build.platform" value="Win32" />
-    <call target="compile-dzserial-number-platform" />
-
-    <property name="build.platform" value="x64" />
-    <call target="compile-dzserial-number-platform" />
-  </target>
-
-  <target name="compile-dzserial-number-platform">
-    <if test="${os.win}">
-      <property name="build.configuration" value="Debug" />
-      <call target="compile-dzserial-number-configuration" />
-
-      <property name="build.configuration" value="Release" />
-      <call target="compile-dzserial-number-configuration" />
-    </if>
-  </target>
-
-  <target name="compile-dzserial-number-configuration">
-    <if test="${os.win}">
-      <exec program="${msbuild.exe}" workingdir="${dzserialnumber.trunk.dir}" verbose="${verbose}">
-        <environment>
-          <variable name="DAZ_BOOST_LOCATION" value="${boost.packaging.dir}"/>
-        </environment>
+      
+      <exec program="${msbuild.exe}" workingdir="${build.protobuf.configuration.dir}" verbose="${verbose}">
         <arg value="/nologo" />
-        <arg value="DzSerialNumber_sdk5.sln" />
+        <arg value="protobuf.sln" />
         <arg value="${msbuild.target.switch}" />
-        <arg value="/property:Configuration=Debug" if="${build.configuration == 'Debug'}" />
-        <arg value="/property:Configuration=Release" if="${build.configuration == 'Release'}" />
-        <arg value="/property:Platform=${build.platform}" if="${build.platform == 'x64'}"/>
-        <arg value="/property:Platform=x86" if="${build.platform == 'Win32'}"/>
+        <arg value="/property:Configuration=${build.solution.configuration}" />
+        <arg value="/property:Platform=${build.platform}" />
       </exec>
+      
+      <exec program="${msbuild.exe}" workingdir="${build.protobuf.configuration.dir}" verbose="${verbose}">
+        <arg value="/nologo" />
+        <arg value="${msbuild.target.switch}" />
+        <arg value="INSTALL.vcxproj" />
+        <arg value="/property:Configuration=${build.solution.configuration}" />
+        <arg value="/property:Platform=${build.platform}" />
+      </exec>
+    </if>
+
+    <if test="${os.mac}">
+      <exec program="cmake" workingdir="${build.protobuf.configuration.dir}" verbose="${verbose}" >
+        <arg value="-G" />
+        <arg value="Unix Makefiles" />
+        <arg value="-DCMAKE_BUILD_TYPE=${build.configuration}" />
+        <arg value="-DCMAKE_OSX_ARCHITECTURES=i386" if="${build.bit.architecture == '32'}" />
+        <arg value="-DCMAKE_OSX_ARCHITECTURES=x86_64" if="${build.bit.architecture == '64'}" />
+        <arg value="-DCMAKE_OSX_DEPLOYMENT_TARGET=10.5" />
+        <arg value="-Dprotobuf_BUILD_TESTS=OFF" />
+        <arg value="-Dprotobuf_DEBUG_POSTFIX=&quot;&quot;" />
+        <arg value="-DCMAKE_INSTALL_PREFIX=${configuration.install.dir}" />
+        <arg value="${project.src.dir}/cmake" />
+      </exec>
+      
+      <exec program="make" workingdir="${build.protobuf.configuration.dir}" verbose="${verbose}">
+        <arg value="-j" />
+        <arg value="8" />
+      </exec>
+   
+      <exec program="make" workingdir="${build.protobuf.configuration.dir}" verbose="${verbose}">
+        <arg value="install" />
+      </exec>
+      
     </if>
   </target>
 
